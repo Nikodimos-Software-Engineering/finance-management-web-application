@@ -35,7 +35,7 @@ export default function RegisterPage() {
       if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
 
       setLoading(false);
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       if (err.response && err.response.data) setErrors(err.response.data);
       else setErrors({ detail: "Network error" });

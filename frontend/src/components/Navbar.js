@@ -8,7 +8,7 @@ export default function Navbar() {
   const pathname = usePathname() || "/";
   const [open, setOpen] = useState(false);
 
-  if (pathname === "/" || pathname === "/dashboard") return null;
+  if (pathname === "/" || pathname === "/dashboard" || pathname === "/login" || pathname === "/register") return null;
 
   const links = [
     { href: "/dashboard", label: "Dashboard" },

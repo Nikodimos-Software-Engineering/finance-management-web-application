@@ -450,6 +450,12 @@ export default function TransactionsPage() {
       }
       setIsOpen(false);
       setPage(1);
+      // notify other pages (accounts) to refresh balances
+      try {
+        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("accounts:update"));
+      } catch (e) {
+        // ignore
+      }
     } catch {
       alert("Failed to create transaction");
     }
@@ -470,6 +476,10 @@ export default function TransactionsPage() {
       } catch (err) {
         console.warn("Failed to refresh budgets", err);
       }
+      // notify accounts to refresh balances
+      try {
+        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("accounts:update"));
+      } catch (e) {}
     } catch {
       alert("Failed to delete transaction");
     }
@@ -505,6 +515,10 @@ export default function TransactionsPage() {
       }
       setEditing(null);
       setIsOpen(false);
+      // notify accounts to refresh balances
+      try {
+        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("accounts:update"));
+      } catch (e) {}
     } catch {
       alert("Failed to update transaction");
     }

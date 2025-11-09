@@ -26,7 +26,7 @@ export default function LoginPage() {
       if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
 
       setLoading(false);
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       if (err.response && err.response.data) setError(err.response.data);
       else setError({ detail: "Network error" });

@@ -104,7 +104,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
 		return Transaction.objects.filter(user=self.request.user).order_by("-date", "-created_at")
 
 	def perform_create(self, serializer):
-		# if a budget was provided, ensure it belongs to the user
+		
 		budget = serializer.validated_data.get("budget") if hasattr(serializer, "validated_data") else None
 		if budget is not None and budget.user != self.request.user:
 			raise exceptions.ValidationError({"budget": "Invalid budget"})
@@ -118,7 +118,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
 
 class SavingsGoalViewSet(viewsets.ModelViewSet):
-	"""Manage user's savings goals."""
+	
 	serializer_class = SavingsGoalSerializer
 	permission_classes = [permissions.IsAuthenticated]
 
@@ -130,12 +130,11 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
 
 	@action(detail=True, methods=["post"])
 	def add(self, request, pk=None):
-		"""Add amount to the current_amount for a goal. Expects { amount: number } in POST body."""
+		
 		goal = get_object_or_404(SavingsGoal, pk=pk, user=request.user)
 		amount = request.data.get("amount")
-		# Use Decimal to avoid mixing float and Decimal types
+		
 		try:
-			# Accept numeric or string inputs; convert safely to Decimal
 			amount = Decimal(str(amount))
 		except (InvalidOperation, TypeError, ValueError):
 			return Response({"detail": "Invalid amount"}, status=status.HTTP_400_BAD_REQUEST)
@@ -143,7 +142,6 @@ class SavingsGoalViewSet(viewsets.ModelViewSet):
 		if amount <= Decimal("0"):
 			return Response({"detail": "Amount must be positive"}, status=status.HTTP_400_BAD_REQUEST)
 
-		# Ensure arithmetic is performed with Decimal
 		goal.current_amount = (goal.current_amount or Decimal("0")) + amount
 		goal.save()
 		return Response(SavingsGoalSerializer(goal).data, status=status.HTTP_200_OK)

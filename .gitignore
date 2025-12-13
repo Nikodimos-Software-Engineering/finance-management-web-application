@@ -102,3 +102,4 @@ Thumbs.db
 bower_components/
 .terraform/"db.sqlite3" 
 "*.sqlite3" 
+"backend/db.sqlite3" 

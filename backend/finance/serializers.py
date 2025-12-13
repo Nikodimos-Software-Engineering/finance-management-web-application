@@ -81,7 +81,6 @@ class TransactionSerializer(serializers.ModelSerializer):
 	category = CategorySerializer(read_only=True)
 	category_id = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), source="category", write_only=True)
 	budget = serializers.SerializerMethodField(read_only=True)
-    # allow writing budget by id; queryset left generic, view will validate ownership
 	budget_id = serializers.PrimaryKeyRelatedField(queryset=Budget.objects.all(), source="budget", write_only=True, allow_null=True, required=False)
 
 	class Meta:

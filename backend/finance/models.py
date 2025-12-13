@@ -35,7 +35,6 @@ class Budget(models.Model):
 	remaining_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
 	def save(self, *args, **kwargs):
-		# On creation, set remaining_amount to allocated_amount
 		if self.pk is None:
 			self.remaining_amount = self.allocated_amount
 		super().save(*args, **kwargs)
@@ -61,17 +60,13 @@ class Transaction(models.Model):
 		return f"{self.category} {self.amount} ({self.user})"
 
 	def apply_effect(self):
-		"""Apply this transaction's effects to account balance and related budget."""
-		# income increases account.balance
 		if self.category.type == Category.TYPE_INCOME:
 			self.account.balance = (self.account.balance or 0) + self.amount
 			self.account.save()
 		else:
-			# expense
 			self.account.balance = (self.account.balance or 0) - self.amount
 			self.account.save()
-			# decrease budget remaining if exists. if this transaction has an explicit budget, use it;
-			# otherwise try to find a budget by user+category
+			
 			budget = None
 			if self.budget_id:
 				try:
@@ -89,14 +84,12 @@ class Transaction(models.Model):
 				budget.save()
 
 	def reverse_effect(self):
-		"""Reverse this transaction's effects (used for update/delete)."""
 		if self.category.type == Category.TYPE_INCOME:
 			self.account.balance = (self.account.balance or 0) - self.amount
 			self.account.save()
 		else:
 			self.account.balance = (self.account.balance or 0) + self.amount
 			self.account.save()
-			# reverse effect on related budget (prefer explicit budget)
 			budget = None
 			if self.budget_id:
 				try:
@@ -114,19 +107,15 @@ class Transaction(models.Model):
 				budget.save()
 
 	def save(self, *args, **kwargs):
-		# handle updates: if updating existing, reverse old effect first
 		with transaction.atomic():
 			if self.pk:
 				old = Transaction.objects.select_for_update().get(pk=self.pk)
-				# reverse old
 				old.reverse_effect()
 			super().save(*args, **kwargs)
-			# apply new
 			self.apply_effect()
 
 	def delete(self, *args, **kwargs):
 		with transaction.atomic():
-			# reverse before delete
 			self.reverse_effect()
 			super().delete(*args, **kwargs)
 

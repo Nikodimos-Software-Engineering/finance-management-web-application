@@ -100,4 +100,5 @@ Thumbs.db
 *.tgz
 *.lock-wscript
 bower_components/
-.terraform/
+.terraform/"db.sqlite3" 
+"*.sqlite3" 

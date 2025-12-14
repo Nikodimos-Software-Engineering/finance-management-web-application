@@ -27,7 +27,7 @@ export default function RegisterPage() {
     setErrors(null);
 
     try {
-      const data = await apiFetch("api/register", {
+      const data = await apiFetch("api/register/", {
         method: "POST",
         body: JSON.stringify(form),
       });

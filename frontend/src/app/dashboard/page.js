@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/utils/api";
 import {
   LineChart,
   Line,
@@ -15,15 +15,6 @@ import {
   Pie,
   Cell,
 } from "recharts";
-
-const api = axios.create({ baseURL: "/api" });
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access");
-    if (token) config.headers["Authorization"] = `Bearer ${token}`;
-  }
-  return config;
-});
 
 const COLORS = ["#60a5fa", "#34d399", "#f59e0b", "#f87171", "#a78bfa", "#fbbf24"];
 
@@ -52,6 +43,45 @@ function MiniTxn({ tx }) {
   );
 }
 
+function getHeaders() {
+  const headers = {};
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("access");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+}
+
+async function fetchAccounts() {
+  const data = await apiFetch("api/accounts/", {
+    headers: getHeaders(),
+  });
+  return data;
+}
+
+async function fetchTransactions() {
+  const data = await apiFetch("api/transactions/", {
+    headers: getHeaders(),
+  });
+  return data;
+}
+
+async function fetchBudgets() {
+  const data = await apiFetch("api/budgets/", {
+    headers: getHeaders(),
+  });
+  return data;
+}
+
+async function fetchSavingsGoals() {
+  const data = await apiFetch("api/savings-goals/", {
+    headers: getHeaders(),
+  });
+  return data;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [accounts, setAccounts] = useState([]);
@@ -64,7 +94,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadAll();
-    // read cached user from localStorage (set during login/register)
     try {
       if (typeof window !== "undefined") {
         const raw = localStorage.getItem("user");
@@ -73,25 +102,28 @@ export default function DashboardPage() {
           const name = [parsed.first_name, parsed.last_name].filter(Boolean).join(" ") || parsed.username || "";
           setUserName(name);
         }
+        else{
+          router.replace("/")
+        }
       }
     } catch (e) {
-      // ignore parse errors
+      // ignore
     }
   }, []);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [accRes, txRes, bdRes, svRes] = await Promise.all([
-        api.get("/accounts/"),
-        api.get("/transactions/"),
-        api.get("/budgets/"),
-        api.get("/savings-goals/"),
+      const [accData, txData, bdData, svData] = await Promise.all([
+        fetchAccounts(),
+        fetchTransactions(),
+        fetchBudgets(),
+        fetchSavingsGoals(),
       ]);
-      setAccounts(accRes.data || []);
-      setTransactions((txRes.data || []).sort((a, b) => (a.date < b.date ? 1 : -1)));
-      setBudgets(bdRes.data || []);
-      setSavings(svRes.data || []);
+      setAccounts(accData || []);
+      setTransactions((txData || []).sort((a, b) => (a.date < b.date ? 1 : -1)));
+      setBudgets(bdData || []);
+      setSavings(svData || []);
     } catch (err) {
       console.warn("Dashboard load failed, using empty data", err);
       setAccounts([]);
@@ -105,7 +137,6 @@ export default function DashboardPage() {
 
   const totalBalance = useMemo(() => accounts.reduce((s, a) => s + Number(a.balance || 0), 0), [accounts]);
 
-  // Simple month bucket (YYYY-MM) for last 6 months
   function lastNMonths(n = 6) {
     const res = [];
     const now = new Date();
@@ -182,7 +213,7 @@ export default function DashboardPage() {
         <div>
           <div className="text-xl font-semibold mb-6">Budget Tracker</div>
           <nav className="flex flex-col gap-2">
-            <button onClick={() => router.push('/dashboard')} className="text-left px-3 py-2 rounded hover:bg-gray-100">🏠 Dashboard</button>
+            <button onClick={() => router.push('/transactions')} className="text-left px-3 py-2 rounded hover:bg-gray-100">💸 Transactions</button>
             <button onClick={() => router.push('/budget')} className="text-left px-3 py-2 rounded hover:bg-gray-100">💼 Budgets</button>
             <button onClick={() => router.push('/savings-goals')} className="text-left px-3 py-2 rounded hover:bg-gray-100">🥅 Savings Goals</button>
             <button onClick={() => router.push('/accounts')} className="text-left px-3 py-2 rounded hover:bg-gray-100">💳 Accounts</button>

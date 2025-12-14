@@ -2,15 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { apiFetch } from "@/utils/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ username: "", password: "" });
+
+  const [form, setForm] = useState({
+    username: "",
+    password: "",
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,25 +25,33 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await axios.post("/api/login/", form);
-      const data = res.data;
+      const data = await apiFetch("api/login/", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
 
       if (data.access) localStorage.setItem("access", data.access);
       if (data.refresh) localStorage.setItem("refresh", data.refresh);
       if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
 
-      setLoading(false);
       router.push("/dashboard");
     } catch (err) {
-      if (err.response && err.response.data) setError(err.response.data);
-      else setError({ detail: "Network error" });
+      if (err?.data) {
+        setError(err.data);
+      } else {
+        setError({ detail: "Network error" });
+      }
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form onSubmit={handleSubmit} className="w-full max-w-md bg-white p-6 rounded shadow">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-md bg-white p-6 rounded shadow"
+      >
         <h2 className="text-2xl font-semibold mb-4">Sign in</h2>
 
         {error && (
@@ -48,10 +63,28 @@ export default function LoginPage() {
         )}
 
         <div className="grid gap-3">
-          <input name="username" placeholder="Username" value={form.username} onChange={handleChange} className="border rounded px-3 py-2" />
-          <input name="password" type="password" placeholder="Password" value={form.password} onChange={handleChange} className="border rounded px-3 py-2" />
+          <input
+            name="username"
+            placeholder="Username"
+            value={form.username}
+            onChange={handleChange}
+            className="border rounded px-3 py-2"
+          />
 
-          <button type="submit" disabled={loading} className="mt-2 w-full bg-green-600 text-white py-2 rounded">
+          <input
+            name="password"
+            type="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={handleChange}
+            className="border rounded px-3 py-2"
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-2 w-full bg-green-600 text-white py-2 rounded"
+          >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </div>

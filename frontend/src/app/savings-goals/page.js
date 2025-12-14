@@ -1,19 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-
-const api = axios.create({ baseURL: "/api" });
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access");
-    if (token) config.headers["Authorization"] = `Bearer ${token}`;
-  }
-  return config;
-});
+import { apiFetch } from "@/utils/api";
 
 function pctToColor(pct) {
-  // pct: 0..100
   if (pct <= 33) return "bg-red-500";
   if (pct <= 66) return "bg-orange-400";
   return "bg-green-500";
@@ -34,7 +24,6 @@ function CircularProgress({ pct, size = 120, stroke = 10 }) {
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (pct / 100) * circumference;
 
-  // pick color via pct
   const color = pct <= 33 ? "#ef4444" : pct <= 66 ? "#f97316" : "#10b981";
 
   return (
@@ -72,8 +61,8 @@ export default function SavingsGoalsPage() {
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [active, setActive] = useState(null); // active goal object
-  const [mode, setMode] = useState("view"); // view | add | edit
+  const [active, setActive] = useState(null);
+  const [mode, setMode] = useState("view");
   const [amountToAdd, setAmountToAdd] = useState("");
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -82,11 +71,24 @@ export default function SavingsGoalsPage() {
     loadGoals();
   }, []);
 
+  function getHeaders() {
+    const headers = {};
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("access");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+    return headers;
+  }
+
   async function loadGoals() {
     setLoading(true);
     try {
-      const res = await api.get("/savings-goals/");
-      setGoals(res.data);
+      const data = await apiFetch("api/savings-goals/", {
+        headers: getHeaders(),
+      });
+      setGoals(data);
       setError(null);
     } catch (err) {
       console.error("Failed to load savings goals", err?.message || err);
@@ -114,21 +116,20 @@ export default function SavingsGoalsPage() {
     const amt = parseFloat(amountToAdd);
     if (Number.isNaN(amt) || amt <= 0) return alert("Enter a valid positive amount");
 
-    // optimistic update
     const updated = goals.map((g) => (g.id === active.id ? { ...g, current_amount: (g.current_amount || 0) + amt } : g));
     setGoals(updated);
-    // also update active so modal shows new amount immediately
     setActive((prev) => (prev && prev.id === active.id ? { ...prev, current_amount: (prev.current_amount || 0) + amt } : prev));
 
     try {
-      const res = await api.post(`/savings-goals/${active.id}/add/`, { amount: amt });
-      // use server response to ensure canonical values (decimals, etc.)
-      const serverGoal = res.data;
-      setGoals((prev) => prev.map((g) => (g.id === serverGoal.id ? serverGoal : g)));
-      setActive(serverGoal);
+      const data = await apiFetch(`api/savings-goals/${active.id}/add/`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ amount: amt }),
+      });
+      setGoals((prev) => prev.map((g) => (g.id === data.id ? data : g)));
+      setActive(data);
     } catch (err) {
       console.warn("Add saving failed", err?.message || err);
-      // revert fallback: reload
       await loadGoals();
     }
 
@@ -137,15 +138,17 @@ export default function SavingsGoalsPage() {
   }
 
   async function handleCreateGoal(data) {
-    // data: { name, target_amount, description }
     setCreating(true);
     try {
-      const res = await api.post(`/savings-goals/`, data);
-      // prepend to list
-      setGoals((prev) => [res.data, ...(prev || [])]);
+      const goalData = await apiFetch("api/savings-goals/", {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      });
+      setGoals((prev) => [goalData, ...(prev || [])]);
       setModalOpen(false);
       setMode("view");
-      setActive(res.data);
+      setActive(goalData);
     } catch (err) {
       console.error("Create goal failed", err?.message || err);
       alert("Failed to create goal");
@@ -155,7 +158,6 @@ export default function SavingsGoalsPage() {
   }
 
   async function handleEditGoal(changes) {
-    // changes: { name, target, description }
     const payload = {
       name: changes.name,
       target_amount: changes.target,
@@ -167,7 +169,11 @@ export default function SavingsGoalsPage() {
     );
     setGoals(updated);
     try {
-      await api.put(`/savings-goals/${active.id}/`, payload);
+      await apiFetch(`api/savings-goals/${active.id}/`, {
+        method: "PUT",
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
     } catch (err) {
       console.warn("Edit goal failed", err?.message || err);
       await loadGoals();
@@ -182,7 +188,10 @@ export default function SavingsGoalsPage() {
     setGoals(goals.filter((g) => g.id !== id));
     closeModal();
     try {
-      await api.delete(`/savings-goals/${id}/`);
+      await apiFetch(`api/savings-goals/${id}/`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
     } catch (err) {
       console.warn("Delete failed", err?.message || err);
       setGoals(prev);
@@ -232,26 +241,26 @@ export default function SavingsGoalsPage() {
           ) : (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {goals.map((g) => {
-            const pct = Math.min(100, Math.round(((g.current_amount || 0) / (g.target_amount || 1)) * 100));
-            return (
-              <div
-                key={g.id}
-                className="bg-white rounded shadow p-4 cursor-pointer hover:shadow-md flex flex-col"
-                onClick={() => openModal(g, "view")}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-sm text-gray-500">{g.name}</div>
-                    <div className="text-lg font-semibold text-gray-900">${Number(g.current_amount || 0).toFixed(2)}</div>
-                    <div className="text-xs text-gray-400">Target ${Number(g.target_amount || 0).toFixed(2)}</div>
-                  </div>
-                </div>
+                const pct = Math.min(100, Math.round(((g.current_amount || 0) / (g.target_amount || 1)) * 100));
+                return (
+                  <div
+                    key={g.id}
+                    className="bg-white rounded shadow p-4 cursor-pointer hover:shadow-md flex flex-col"
+                    onClick={() => openModal(g, "view")}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm text-gray-500">{g.name}</div>
+                        <div className="text-lg font-semibold text-gray-900">${Number(g.current_amount || 0).toFixed(2)}</div>
+                        <div className="text-xs text-gray-400">Target ${Number(g.target_amount || 0).toFixed(2)}</div>
+                      </div>
+                    </div>
 
-                <div className="mt-4">
-                  <HorizontalProgress value={pct} />
-                </div>
-              </div>
-            );
+                    <div className="mt-4">
+                      <HorizontalProgress value={pct} />
+                    </div>
+                  </div>
+                );
               })}
             </div>
           )}

@@ -1,16 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-
-const api = axios.create({ baseURL: "/api" });
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access");
-    if (token) config.headers["Authorization"] = `Bearer ${token}`;
-  }
-  return config;
-});
+import { apiFetch } from "@/utils/api";
 
 function currency(n) {
   return `$${Number(n || 0).toFixed(2)}`;
@@ -73,11 +64,24 @@ export default function BudgetPage() {
     fetchCategories();
   }, []);
 
+  function getHeaders() {
+    const headers = {};
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("access");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+    return headers;
+  }
+
   async function load() {
     setLoading(true);
     try {
-      const res = await api.get("/budgets/");
-      setBudgets(res.data || []);
+      const data = await apiFetch("api/budgets/", {
+        headers: getHeaders(),
+      });
+      setBudgets(data || []);
     } catch (err) {
       console.error(err);
       setBudgets([]);
@@ -88,9 +92,10 @@ export default function BudgetPage() {
 
   async function fetchCategories() {
     try {
-      const res = await api.get("/categories/");
-      // filter expense categories
-      const expense = (res.data || []).filter((c) => c.type === "expense");
+      const data = await apiFetch("api/categories/", {
+        headers: getHeaders(),
+      });
+      const expense = (data || []).filter((c) => c.type === "expense");
       setCategories(expense);
     } catch (err) {
       setCategories([]);
@@ -131,12 +136,20 @@ export default function BudgetPage() {
     try {
       if (editing) {
         const payload = { category_id: formCategory, allocated_amount: formAmount };
-        const res = await api.put(`/budgets/${editing.id}/`, payload);
-        setBudgets((prev) => prev.map((p) => (p.id === res.data.id ? res.data : p)));
+        const data = await apiFetch(`api/budgets/${editing.id}/`, {
+          method: "PUT",
+          headers: getHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setBudgets((prev) => prev.map((p) => (p.id === data.id ? data : p)));
       } else {
         const payload = { category_id: formCategory, allocated_amount: formAmount };
-        const res = await api.post(`/budgets/`, payload);
-        setBudgets((prev) => [res.data, ...(prev || [])]);
+        const data = await apiFetch("api/budgets/", {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setBudgets((prev) => [data, ...(prev || [])]);
       }
       setModalOpen(false);
     } catch (err) {
@@ -152,7 +165,10 @@ export default function BudgetPage() {
     const prev = budgets;
     setBudgets(prev.filter((x) => x.id !== b.id));
     try {
-      await api.delete(`/budgets/${b.id}/`);
+      await apiFetch(`api/budgets/${b.id}/`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
     } catch (err) {
       console.error(err);
       setBudgets(prev);

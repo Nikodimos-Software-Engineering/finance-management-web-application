@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { apiFetch } from "@/utils/api";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -27,8 +27,10 @@ export default function RegisterPage() {
     setErrors(null);
 
     try {
-      const res = await axios.post("/api/register", form);
-      const data = res.data;
+      const data = await apiFetch("api/register", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
 
       if (data.access) localStorage.setItem("access", data.access);
       if (data.refresh) localStorage.setItem("refresh", data.refresh);
@@ -37,7 +39,7 @@ export default function RegisterPage() {
       setLoading(false);
       router.push("/dashboard");
     } catch (err) {
-      if (err.response && err.response.data) setErrors(err.response.data);
+      if (err.data) setErrors(err.data);
       else setErrors({ detail: "Network error" });
       setLoading(false);
     }

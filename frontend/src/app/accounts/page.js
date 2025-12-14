@@ -1,16 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-
-const api = axios.create({ baseURL: "/api" });
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access");
-    if (token) config.headers["Authorization"] = `Bearer ${token}`;
-  }
-  return config;
-});
+import { apiFetch } from "@/utils/api";
 
 function currency(n) {
   return `$${Number(n || 0).toFixed(2)}`;
@@ -63,6 +54,7 @@ export default function AccountsPage() {
   const [notesMap, setNotesMap] = useState({});
   const [toDelete, setToDelete] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     load();
@@ -71,7 +63,6 @@ export default function AccountsPage() {
     if (typeof window !== "undefined") {
       window.addEventListener("accounts:update", handler);
     }
-    // periodic refresh as fallback
     const int = setInterval(() => load(), 15000);
     return () => {
       if (typeof window !== "undefined") window.removeEventListener("accounts:update", handler);
@@ -79,13 +70,28 @@ export default function AccountsPage() {
     };
   }, []);
 
+  function getHeaders() {
+    const headers = {};
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("access");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+    return headers;
+  }
+
   async function load() {
     setLoading(true);
+    setError(null); 
     try {
-      const res = await api.get("/accounts/");
-      setAccounts(res.data || []);
+      const data = await apiFetch("api/accounts/", {
+        headers: getHeaders(),
+      });
+      setAccounts(data || []);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load accounts:", err);
+      setError(`Failed to load accounts: ${err.status || 'Network error'}`);
       setAccounts([]);
     } finally {
       setLoading(false);
@@ -115,19 +121,27 @@ export default function AccountsPage() {
     try {
       if (editing) {
         const payload = { name: formName, balance: formBalance };
-        const res = await api.put(`/accounts/${editing.id}/`, payload);
-        setAccounts((prev) => prev.map((p) => (p.id === res.data.id ? res.data : p)));
-        setNotesMap((n) => ({ ...n, [res.data.id]: formNotes }));
+        const data = await apiFetch(`api/accounts/${editing.id}`, {
+          method: "PUT",
+          headers: getHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setAccounts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
+        setNotesMap((n) => ({ ...n, [data.id]: formNotes }));
       } else {
         const payload = { name: formName, balance: formBalance };
-        const res = await api.post(`/accounts/`, payload);
-        setAccounts((prev) => [res.data, ...(prev || [])]);
-        setNotesMap((n) => ({ ...n, [res.data.id]: formNotes }));
+        const data = await apiFetch("api/accounts/", {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setAccounts((prev) => [data, ...(prev || [])]);
+        setNotesMap((n) => ({ ...n, [data.id]: formNotes }));
       }
       setModalOpen(false);
     } catch (err) {
-      console.error(err);
-      alert("Failed to save account");
+      console.error("Failed to save account:", err);
+      alert(`Failed to save account: ${err.status || 'Network error'}`);
     } finally {
       setSaving(false);
     }
@@ -144,16 +158,19 @@ export default function AccountsPage() {
     setAccounts(prev.filter((x) => x.id !== toDelete.id));
     setConfirmOpen(false);
     try {
-      await api.delete(`/accounts/${toDelete.id}/`);
+      await apiFetch(`api/accounts/${toDelete.id}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
       setNotesMap((n) => {
         const nxt = { ...n };
         delete nxt[toDelete.id];
         return nxt;
       });
     } catch (err) {
-      console.error(err);
+      console.error("Failed to delete account:", err);
       setAccounts(prev);
-      alert("Failed to delete account");
+      alert(`Failed to delete account: ${err.status || 'Network error'}`);
     }
   }
 
@@ -163,6 +180,12 @@ export default function AccountsPage() {
     <div className="p-6">
       <h1 className="text-2xl font-semibold">Accounts</h1>
       <p className="text-sm text-gray-500 mt-1 mb-6">Manage your cash, bank, and digital accounts here.</p>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <SummaryCard title="Total Accounts" value={accounts.length} icon="🏦" />
@@ -176,7 +199,7 @@ export default function AccountsPage() {
           {accounts.map((a) => (
             <AccountCard key={a.id} a={a} onEdit={openEdit} onDelete={confirmDelete} notes={notesMap[a.id]} />
           ))}
-          {accounts.length === 0 && <div className="text-sm text-gray-500">No accounts yet. Add one using the + button.</div>}
+          {accounts.length === 0 && !error && <div className="text-sm text-gray-500">No accounts yet. Add one using the + button.</div>}
         </div>
       )}
 

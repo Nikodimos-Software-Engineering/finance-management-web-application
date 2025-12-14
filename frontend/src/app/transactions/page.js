@@ -1,47 +1,71 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { apiFetch } from "@/utils/api";
 
-const api = axios.create({ baseURL: "/api" });
-api.interceptors.request.use((config) => {
+function getHeaders() {
+  const headers = {};
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("access");
-    if (token) config.headers["Authorization"] = `Bearer ${token}`;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
   }
-  return config;
-});
+  return headers;
+}
 
 async function fetchAccounts() {
-  const res = await api.get("/accounts/");
-  return res.data;
+  const data = await apiFetch("api/accounts/", {
+    headers: getHeaders(),
+  });
+  return data;
 }
 
 async function fetchCategories() {
-  const res = await api.get("/categories/");
-  return res.data;
+  const data = await apiFetch("api/categories/", {
+    headers: getHeaders(),
+  });
+  return data;
 }
 
 async function fetchTransactions() {
-  const res = await api.get("/transactions/");
-  return res.data;
+  const data = await apiFetch("api/transactions/", {
+    headers: getHeaders(),
+  });
+  return data;
 }
 
 async function fetchBudgets() {
-  const res = await api.get("/budgets/");
-  return res.data;
+  const data = await apiFetch("api/budgets/", {
+    headers: getHeaders(),
+  });
+  return data;
 }
 
 async function createTransaction(payload) {
-  return (await api.post("/transactions/", payload)).data;
+  const data = await apiFetch("api/transactions/", {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return data;
 }
 
 async function updateTransaction(id, payload) {
-  return (await api.put(`/transactions/${id}/`, payload)).data;
+  const data = await apiFetch(`api/transactions/${id}/`, {
+    method: "PUT",
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return data;
 }
 
 async function deleteTransaction(id) {
-  return (await api.delete(`/transactions/${id}/`)).data;
+  const data = await apiFetch(`api/transactions/${id}/`, {
+    method: "DELETE",
+    headers: getHeaders(),
+  });
+  return data;
 }
 
 function FilterPanel({ accounts, filters, setFilters }) {
@@ -173,7 +197,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
     amount: "",
     budget: "",
   });
-  const [type, setType] = useState("expense"); // default type = expense
+  const [type, setType] = useState("expense");
 
   useEffect(() => {
     if (initial) {
@@ -193,7 +217,6 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
   }, [initial, isOpen]);
 
   const filteredCategories = categories.filter((c) => c.type === type);
-  // budgets filtered by selected category
   const budgetsForCategory = (budgets || []).filter((b) => String(b.category?.id) === String(form.category));
 
   if (!isOpen) return null;
@@ -378,18 +401,15 @@ export default function TransactionsPage() {
   function doFilter(list, filters) {
     if (!list) return [];
     return list.filter((tx) => {
-      // account filter
       if (filters.account) {
         const accId = tx.account?.id != null ? String(tx.account.id) : String(tx.account);
         if (accId !== String(filters.account)) return false;
       }
 
-      // type filter (income/expense)
       if (filters.type) {
         if (tx.category?.type !== filters.type) return false;
       }
 
-      // date range filters (inclusive)
       if (filters.date_after) {
         const txDate = new Date(tx.date);
         const afterDate = new Date(filters.date_after);
@@ -431,7 +451,6 @@ export default function TransactionsPage() {
       description: payload.description,
       date: payload.date,
       amount: payload.amount,
-      // include optional budget selection
       ...(payload.budget ? { budget_id: payload.budget } : {}),
     };
     try {
@@ -441,7 +460,6 @@ export default function TransactionsPage() {
         setTransactions(doFilter(next, filters));
         return next;
       });
-      // refresh budgets so remaining_amount updates in UI
       try {
         const newB = await fetchBudgets();
         setBudgets(newB || []);
@@ -450,7 +468,6 @@ export default function TransactionsPage() {
       }
       setIsOpen(false);
       setPage(1);
-      // notify other pages (accounts) to refresh balances
       try {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("accounts:update"));
       } catch (e) {
@@ -469,14 +486,12 @@ export default function TransactionsPage() {
         setTransactions(doFilter(next, filters));
         return next;
       });
-      // refresh budgets
       try {
         const newB = await fetchBudgets();
         setBudgets(newB || []);
       } catch (err) {
         console.warn("Failed to refresh budgets", err);
       }
-      // notify accounts to refresh balances
       try {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("accounts:update"));
       } catch (e) {}
@@ -506,7 +521,6 @@ export default function TransactionsPage() {
         setTransactions(doFilter(next, filters));
         return next;
       });
-      // refresh budgets after update
       try {
         const newB = await fetchBudgets();
         setBudgets(newB || []);
@@ -515,7 +529,6 @@ export default function TransactionsPage() {
       }
       setEditing(null);
       setIsOpen(false);
-      // notify accounts to refresh balances
       try {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("accounts:update"));
       } catch (e) {}

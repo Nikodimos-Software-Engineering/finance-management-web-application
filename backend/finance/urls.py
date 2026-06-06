@@ -11,7 +11,7 @@ router.register(r"transactions", TransactionViewSet, basename="transaction")
 router.register(r"savings-goals", SavingsGoalViewSet, basename="savingsgoal")
 
 urlpatterns = [
-	path("register/", RegisterView.as_view(), name="register"),
-	path("login/", LoginView.as_view(), name="login"),
+	path("register", RegisterView.as_view(), name="register"),
+	path("login", LoginView.as_view(), name="login"),
 	path("", include(router.urls)),
 ]

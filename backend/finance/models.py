@@ -4,7 +4,7 @@ from django.utils import timezone
 
 
 class Account(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='accounts')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=100)
     account_type = models.CharField(max_length=50)
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -54,7 +54,7 @@ class Transaction(models.Model):
         ('income', 'Income'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(max_digits=12, decimal_places=2)

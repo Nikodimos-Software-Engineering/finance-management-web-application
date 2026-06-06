@@ -5,7 +5,7 @@ if (!API_URL) {
 }
 
 export async function apiFetch(endpoint, options = {}) {
-  const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, "");
+  const cleanEndpoint = endpoint.replace(/^\/+/, "");
   const url = `${API_URL}/${cleanEndpoint}`;
 
   const res = await fetch(url, {

@@ -3,7 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import RegisterView, LoginView, AccountViewSet, CategoryViewSet, BudgetViewSet, TransactionViewSet, SavingsGoalViewSet
 
-router = DefaultRouter()
+router = DefaultRouter(trailing_slash=False)
 router.register(r"accounts", AccountViewSet, basename="account")
 router.register(r"categories", CategoryViewSet, basename="category")
 router.register(r"budgets", BudgetViewSet, basename="budget")

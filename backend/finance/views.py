@@ -1,14 +1,13 @@
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import viewsets, permissions
-from rest_framework import exceptions
 from rest_framework.decorators import action
-from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from .models import Account, Category, Budget, Transaction, SavingsGoal
 from decimal import Decimal, InvalidOperation
@@ -19,10 +18,8 @@ from .serializers import (
 	CategorySerializer,
 	BudgetSerializer,
 	TransactionSerializer,
-    SavingsGoalSerializer,
+	SavingsGoalSerializer,
 )
-
-from .serializers import RegistrationSerializer, LoginSerializer
 
 
 User = get_user_model()
@@ -101,87 +98,84 @@ class TransactionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Transaction.objects.filter(user=self.request.user).order_by("-date", "-created_at")
+        return Transaction.objects.filter(user=self.request.user).select_related("account", "category").order_by("-date", "-created_at")
 
     def perform_create(self, serializer):
-        transaction = serializer.save(user=self.request.user)
-        
-        # Update account balance when creating a new transaction
-        account = transaction.account
-        if transaction.transaction_type == 'expense':
-            account.balance -= transaction.amount
-        elif transaction.transaction_type == 'income':
-            account.balance += transaction.amount
-        account.save()
+        with transaction.atomic():
+            trans = serializer.save(user=self.request.user)
+
+            account = trans.account
+            if trans.transaction_type == 'expense':
+                account.balance -= trans.amount
+            elif trans.transaction_type == 'income':
+                account.balance += trans.amount
+            account.save()
+
+            self._update_budget(trans)
 
     def perform_update(self, serializer):
-        # Get the original transaction before updating
-        original_transaction = self.get_object()
-        original_amount = original_transaction.amount
-        original_type = original_transaction.transaction_type
-        original_account = original_transaction.account
-        
-        # Update the transaction
-        updated_transaction = serializer.save()
-        new_amount = updated_transaction.amount
-        new_type = updated_transaction.transaction_type
-        new_account = updated_transaction.account
-        
-        # Calculate the adjustment
-        adjustment = Decimal('0')
-        
-        # Case 1: Same account, same type
-        if original_account == new_account and original_type == new_type:
-            if original_type == 'expense':
-                # Expense amount changed: original was subtracted, now subtract new
-                # So we need to add back original and subtract new
-                adjustment = original_amount - new_amount
-            else:  # income
-                # Income amount changed: original was added, now add new
-                # So we need to subtract original and add new
-                adjustment = new_amount - original_amount
-        
-        # Case 2: Same account, different type
-        elif original_account == new_account and original_type != new_type:
-            # Revert original transaction and apply new one
-            if original_type == 'expense':
-                # Add back the original expense, then apply new income
-                adjustment = original_amount + new_amount
-            else:  # original was income
-                # Subtract original income, then apply new expense
-                adjustment = -original_amount - new_amount
-        
-        # Case 3: Different accounts
-        else:
-            # Revert from original account
-            if original_type == 'expense':
-                original_account.balance += original_amount
+        with transaction.atomic():
+            original_transaction = self.get_object()
+            original_amount = original_transaction.amount
+            original_type = original_transaction.transaction_type
+            original_account = original_transaction.account
+
+            updated_transaction = serializer.save()
+            new_amount = updated_transaction.amount
+            new_type = updated_transaction.transaction_type
+            new_account = updated_transaction.account
+
+            adjustment = Decimal('0')
+
+            if original_account == new_account and original_type == new_type:
+                if original_type == 'expense':
+                    adjustment = original_amount - new_amount
+                else:
+                    adjustment = new_amount - original_amount
+
+            elif original_account == new_account and original_type != new_type:
+                if original_type == 'expense':
+                    adjustment = original_amount + new_amount
+                else:
+                    adjustment = -original_amount - new_amount
+
             else:
-                original_account.balance -= original_amount
-            original_account.save()
-            
-            # Apply to new account
-            if new_type == 'expense':
-                new_account.balance -= new_amount
-            else:
-                new_account.balance += new_amount
-            new_account.save()
-            return
-        
-        # Apply adjustment for same account cases
-        if adjustment != Decimal('0'):
-            new_account.balance += adjustment
-            new_account.save()
+                if original_type == 'expense':
+                    original_account.balance += original_amount
+                else:
+                    original_account.balance -= original_amount
+                original_account.save()
+
+                if new_type == 'expense':
+                    new_account.balance -= new_amount
+                else:
+                    new_account.balance += new_amount
+                new_account.save()
+                return
+
+            if adjustment != Decimal('0'):
+                new_account.balance += adjustment
+                new_account.save()
 
     def perform_destroy(self, instance):
-        # Revert the transaction from account balance before deleting
-        account = instance.account
-        if instance.transaction_type == 'expense':
-            account.balance += instance.amount  # Add back the expense
-        else:  # income
-            account.balance -= instance.amount  # Subtract the income
-        account.save()
-        instance.delete()
+        with transaction.atomic():
+            account = instance.account
+            if instance.transaction_type == 'expense':
+                account.balance += instance.amount
+            else:
+                account.balance -= instance.amount
+            account.save()
+            instance.delete()
+
+    def _update_budget(self, trans):
+        if trans.transaction_type != 'expense' or not trans.category:
+            return
+        try:
+            budget = Budget.objects.get(user=trans.user, category=trans.category)
+        except Budget.DoesNotExist:
+            return
+        budget.remaining_amount -= trans.amount
+        budget.save()
 
 
 class SavingsGoalViewSet(viewsets.ModelViewSet):

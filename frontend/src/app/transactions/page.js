@@ -1,51 +1,33 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/utils/api";
-
-function getHeaders() {
-  const headers = {};
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access");
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  }
-  return headers;
-}
+import { useRouter } from "next/navigation";
+import { apiFetch, getAuthHeaders } from "@/utils/api";
 
 async function fetchAccounts() {
-  const data = await apiFetch("api/accounts/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/accounts/", { headers: getAuthHeaders() });
   return data;
 }
 
 async function fetchCategories() {
-  const data = await apiFetch("api/categories/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/categories/", { headers: getAuthHeaders() });
   return data;
 }
 
 async function fetchTransactions() {
-  const data = await apiFetch("api/transactions/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/transactions/", { headers: getAuthHeaders() });
   return data;
 }
 
 async function fetchBudgets() {
-  const data = await apiFetch("api/budgets/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/budgets/", { headers: getAuthHeaders() });
   return data;
 }
 
 async function createTransaction(payload) {
   const data = await apiFetch("api/transactions/", {
     method: "POST",
-    headers: getHeaders(),
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return data;
@@ -54,7 +36,7 @@ async function createTransaction(payload) {
 async function updateTransaction(id, payload) {
   const data = await apiFetch(`api/transactions/${id}/`, {
     method: "PUT",
-    headers: getHeaders(),
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return data;
@@ -63,7 +45,7 @@ async function updateTransaction(id, payload) {
 async function deleteTransaction(id) {
   const data = await apiFetch(`api/transactions/${id}/`, {
     method: "DELETE",
-    headers: getHeaders(),
+    headers: getAuthHeaders(),
   });
   return data;
 }
@@ -134,11 +116,11 @@ function TransactionItem({ tx, onDelete, onEdit }) {
         onClick={() => setOpen((v) => !v)}
       >
         <div className="flex justify-between w-full text-sm">
-          <span className="w-1/3 font-medium">{tx.category.type.toUpperCase()}</span>
-          <span className="w-1/3">{tx.category.name}</span>
+          <span className="w-1/3 font-medium">{tx.category?.type?.toUpperCase() || "—"}</span>
+          <span className="w-1/3">{tx.category?.name || "Uncategorized"}</span>
           <span
             className={`w-1/3 text-right font-semibold ${
-              tx.category.type === "income" ? "text-green-600" : "text-red-600"
+              tx.category?.type === "income" ? "text-green-600" : "text-red-600"
             }`}
           >
             {tx.amount}
@@ -188,36 +170,32 @@ function TransactionList({ transactions, onDelete, onEdit }) {
   );
 }
 
-function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, budgets, initial }) {
+function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, initial }) {
   const [form, setForm] = useState({
+    transaction_type: "expense",
     account: "",
     category: "",
     description: "",
     date: "",
     amount: "",
-    budget: "",
   });
-  const [type, setType] = useState("expense");
 
   useEffect(() => {
     if (initial) {
       setForm({
-        account: initial.account.id,
-        category: initial.category.id,
+        transaction_type: initial.transaction_type || initial.category?.type || "expense",
+        account: initial.account?.id || "",
+        category: initial.category?.id || "",
         description: initial.description || "",
         date: initial.date || "",
         amount: initial.amount || "",
-        budget: initial.budget?.id || "",
       });
-      setType(initial.category?.type || "expense");
     } else {
-      setForm({ account: "", category: "", description: "", date: "", amount: "" });
-      setType("expense");
+      setForm({ transaction_type: "expense", account: "", category: "", description: "", date: "", amount: "" });
     }
   }, [initial, isOpen]);
 
-  const filteredCategories = categories.filter((c) => c.type === type);
-  const budgetsForCategory = (budgets || []).filter((b) => String(b.category?.id) === String(form.category));
+  const filteredCategories = categories.filter((c) => c.type === form.transaction_type);
 
   if (!isOpen) return null;
 
@@ -228,19 +206,18 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
 
   const handleTypeChange = (e) => {
     const newType = e.target.value;
-    setType(newType);
-    setForm((s) => ({ ...s, category: "" }));
+    setForm((s) => ({ ...s, transaction_type: newType, category: "" }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave({
-      account: form.account,
-      category: form.category,
+      transaction_type: form.transaction_type,
+      account_id: form.account,
+      category_id: form.category,
       description: form.description,
       date: form.date,
       amount: form.amount,
-      budget: form.budget || null,
     });
   };
 
@@ -260,7 +237,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
                   type="radio"
                   name="type"
                   value="income"
-                  checked={type === "income"}
+                  checked={form.transaction_type === "income"}
                   onChange={handleTypeChange}
                   className="mr-2"
                 />
@@ -271,7 +248,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
                   type="radio"
                   name="type"
                   value="expense"
-                  checked={type === "expense"}
+                  checked={form.transaction_type === "expense"}
                   onChange={handleTypeChange}
                   className="mr-2"
                 />
@@ -294,7 +271,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
             </select>
           </div>
 
-          {type && (<>
+          {form.transaction_type && (<>
             <div>
               <label className="block text-sm mb-1">Category</label>
               <select
@@ -309,17 +286,6 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
                 ))}
               </select>
             </div>
-            {type === "expense" && form.category && (
-              <div>
-                <label className="block text-sm mb-1">Budget (optional)</label>
-                <select name="budget" value={form.budget} onChange={handleChange} className="w-full border rounded px-2 py-1">
-                  <option value="">-- No budget --</option>
-                  {budgetsForCategory.map((b) => (
-                    <option key={b.id} value={b.id}>{b.category?.name} — {b.allocated_amount}</option>
-                  ))}
-                </select>
-              </div>
-            )}
           </>)}
 
           <div>
@@ -364,6 +330,7 @@ function AddTransactionModal({ isOpen, onClose, onSave, accounts, categories, bu
 }
 
 export default function TransactionsPage() {
+  const router = useRouter();
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [budgets, setBudgets] = useState([]);
@@ -379,6 +346,10 @@ export default function TransactionsPage() {
   const paginated = transactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("access")) {
+      router.replace("/");
+      return;
+    }
     loadMeta();
     loadTransactions();
   }, []);
@@ -445,16 +416,8 @@ export default function TransactionsPage() {
   }
 
   const handleCreate = async (payload) => {
-    const body = {
-      account_id: payload.account,
-      category_id: payload.category,
-      description: payload.description,
-      date: payload.date,
-      amount: payload.amount,
-      ...(payload.budget ? { budget_id: payload.budget } : {}),
-    };
     try {
-      const created = await createTransaction(body);
+      const created = await createTransaction(payload);
       setAllTransactions((prev) => {
         const next = [created, ...prev];
         setTransactions(doFilter(next, filters));
@@ -506,16 +469,8 @@ export default function TransactionsPage() {
   };
 
   const handleSaveEdit = async (payload) => {
-    const body = {
-      account_id: payload.account,
-      category_id: payload.category,
-      description: payload.description,
-      date: payload.date,
-      amount: payload.amount,
-      ...(payload.budget ? { budget_id: payload.budget } : {}),
-    };
     try {
-      const updated = await updateTransaction(editing.id, body);
+      const updated = await updateTransaction(editing.id, payload);
       setAllTransactions((prev) => {
         const next = prev.map((t) => (t.id === updated.id ? updated : t));
         setTransactions(doFilter(next, filters));
@@ -597,7 +552,6 @@ export default function TransactionsPage() {
         onSave={(payload) => (editing ? handleSaveEdit(payload) : handleCreate(payload))}
         accounts={accounts}
         categories={categories}
-        budgets={budgets}
         initial={editing}
       />
     </div>

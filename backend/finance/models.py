@@ -47,6 +47,25 @@ class Budget(models.Model):
 	def __str__(self):
 		return f"Budget {self.category} for {self.user}"
 
+	@property
+	def spent_amount(self):
+		return self.allocated_amount - self.remaining_amount
+
+	@property
+	def spent_percentage(self):
+		if self.allocated_amount == 0:
+			return 0
+		return float(self.spent_amount / self.allocated_amount * 100)
+
+	@property
+	def spending_alert(self):
+		pct = self.spent_percentage
+		if pct >= 100:
+			return {"type": "danger", "message": f"Budget exceeded! Spending is {pct:.0f}% of allocated."}
+		if pct >= 80:
+			return {"type": "warning", "message": f"You've used {pct:.0f}% of your budget."}
+		return None
+
 
 class Transaction(models.Model):
     TRANSACTION_TYPES = [

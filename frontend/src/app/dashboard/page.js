@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/utils/api";
+import { apiFetch, getAuthHeaders } from "@/utils/api";
 import {
   LineChart,
   Line,
@@ -43,42 +43,23 @@ function MiniTxn({ tx }) {
   );
 }
 
-function getHeaders() {
-  const headers = {};
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access");
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  }
-  return headers;
-}
-
 async function fetchAccounts() {
-  const data = await apiFetch("api/accounts/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/accounts/", { headers: getAuthHeaders() });
   return data;
 }
 
 async function fetchTransactions() {
-  const data = await apiFetch("api/transactions/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/transactions/", { headers: getAuthHeaders() });
   return data;
 }
 
 async function fetchBudgets() {
-  const data = await apiFetch("api/budgets/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/budgets/", { headers: getAuthHeaders() });
   return data;
 }
 
 async function fetchSavingsGoals() {
-  const data = await apiFetch("api/savings-goals/", {
-    headers: getHeaders(),
-  });
+  const data = await apiFetch("api/savings-goals/", { headers: getAuthHeaders() });
   return data;
 }
 

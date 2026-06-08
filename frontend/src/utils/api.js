@@ -4,6 +4,17 @@ if (!API_URL) {
   throw new Error("NEXT_PUBLIC_API_URL is not defined");
 }
 
+export function getAuthHeaders() {
+  const headers = {};
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("access");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+}
+
 export async function apiFetch(endpoint, options = {}) {
   const cleanEndpoint = endpoint.replace(/^\/+/, "");
   const url = `${API_URL}/${cleanEndpoint}`;

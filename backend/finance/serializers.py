@@ -57,7 +57,7 @@ class LoginSerializer(serializers.Serializer):
 class AccountSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Account
-		fields = ("id", "name", "balance", "created_at")
+		fields = ("id", "name", "account_type", "balance", "created_at")
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -66,13 +66,22 @@ class CategorySerializer(serializers.ModelSerializer):
 		fields = ("id", "name", "type")
 
 
+class ExpenseCategoryField(serializers.PrimaryKeyRelatedField):
+	def get_queryset(self):
+		return Category.objects.filter(type=Category.TYPE_EXPENSE)
+
+
 class BudgetSerializer(serializers.ModelSerializer):
 	category = CategorySerializer(read_only=True)
-	category_id = serializers.PrimaryKeyRelatedField(queryset=Category.objects.filter(type=Category.TYPE_EXPENSE), source="category", write_only=True)
+	category_id = ExpenseCategoryField(source="category", write_only=True)
+	spending_alert = serializers.SerializerMethodField(read_only=True)
 
 	class Meta:
 		model = Budget
-		fields = ("id", "category", "category_id", "allocated_amount", "remaining_amount")
+		fields = ("id", "category", "category_id", "allocated_amount", "remaining_amount", "spending_alert")
+
+	def get_spending_alert(self, obj):
+		return obj.spending_alert
 
 
 class TransactionSerializer(serializers.ModelSerializer):
@@ -80,24 +89,10 @@ class TransactionSerializer(serializers.ModelSerializer):
 	account_id = serializers.PrimaryKeyRelatedField(queryset=Account.objects.all(), source="account", write_only=True)
 	category = CategorySerializer(read_only=True)
 	category_id = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), source="category", write_only=True)
-	budget = serializers.SerializerMethodField(read_only=True)
-	budget_id = serializers.PrimaryKeyRelatedField(queryset=Budget.objects.all(), source="budget", write_only=True, allow_null=True, required=False)
 
 	class Meta:
 		model = Transaction
-		fields = ("id", "account", "account_id", "category", "category_id", "budget", "budget_id", "description", "date", "amount", "created_at")
-
-	def create(self, validated_data):
-		# user is set in the viewset perform_create
-		return super().create(validated_data)
-
-	def update(self, instance, validated_data):
-		return super().update(instance, validated_data)
-
-	def get_budget(self, obj):
-		if not getattr(obj, "budget", None):
-			return None
-		return {"id": obj.budget.id, "category": obj.budget.category.id if obj.budget.category else None, "allocated_amount": obj.budget.allocated_amount, "remaining_amount": obj.budget.remaining_amount}
+		fields = ("id", "account", "account_id", "category", "category_id", "transaction_type", "description", "date", "amount", "created_at")
 
 
 class SavingsGoalSerializer(serializers.ModelSerializer):

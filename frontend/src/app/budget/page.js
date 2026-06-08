@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/utils/api";
+import { useRouter } from "next/navigation";
+import { apiFetch, getAuthHeaders } from "@/utils/api";
 
 function currency(n) {
   return `$${Number(n || 0).toFixed(2)}`;
@@ -46,6 +47,7 @@ function SummaryCard({ title, value, emoji }) {
 }
 
 export default function BudgetPage() {
+  const router = useRouter();
   const [budgets, setBudgets] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -60,27 +62,18 @@ export default function BudgetPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("access")) {
+      router.replace("/");
+      return;
+    }
     load();
     fetchCategories();
   }, []);
 
-  function getHeaders() {
-    const headers = {};
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("access");
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-    }
-    return headers;
-  }
-
   async function load() {
     setLoading(true);
     try {
-      const data = await apiFetch("api/budgets/", {
-        headers: getHeaders(),
-      });
+      const data = await apiFetch("api/budgets/", { headers: getAuthHeaders() });
       setBudgets(data || []);
     } catch (err) {
       console.error(err);
@@ -92,9 +85,7 @@ export default function BudgetPage() {
 
   async function fetchCategories() {
     try {
-      const data = await apiFetch("api/categories/", {
-        headers: getHeaders(),
-      });
+      const data = await apiFetch("api/categories/", { headers: getAuthHeaders() });
       const expense = (data || []).filter((c) => c.type === "expense");
       setCategories(expense);
     } catch (err) {
@@ -138,7 +129,7 @@ export default function BudgetPage() {
         const payload = { category_id: formCategory, allocated_amount: formAmount };
         const data = await apiFetch(`api/budgets/${editing.id}/`, {
           method: "PUT",
-          headers: getHeaders(),
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
         setBudgets((prev) => prev.map((p) => (p.id === data.id ? data : p)));
@@ -146,7 +137,7 @@ export default function BudgetPage() {
         const payload = { category_id: formCategory, allocated_amount: formAmount };
         const data = await apiFetch("api/budgets/", {
           method: "POST",
-          headers: getHeaders(),
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
         setBudgets((prev) => [data, ...(prev || [])]);
@@ -167,7 +158,7 @@ export default function BudgetPage() {
     try {
       await apiFetch(`api/budgets/${b.id}/`, {
         method: "DELETE",
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
       });
     } catch (err) {
       console.error(err);

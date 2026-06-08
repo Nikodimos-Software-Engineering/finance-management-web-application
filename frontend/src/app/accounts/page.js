@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { apiFetch } from "@/utils/api";
+import { useRouter } from "next/navigation";
+import { apiFetch, getAuthHeaders } from "@/utils/api";
 
 function currency(n) {
   return `$${Number(n || 0).toFixed(2)}`;
@@ -57,6 +58,7 @@ function AccountCard({ a, onEdit, onDelete, notes }) {
 }
 
 export default function AccountsPage() {
+  const router = useRouter();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,6 +67,7 @@ export default function AccountsPage() {
   const [editing, setEditing] = useState(null);
   const [formName, setFormName] = useState("");
   const [formBalance, setFormBalance] = useState(0);
+  const [formType, setFormType] = useState("checking");
   const [formNotes, setFormNotes] = useState("");
   const [notesMap, setNotesMap] = useState({});
   const [toDelete, setToDelete] = useState(null);
@@ -77,6 +80,10 @@ export default function AccountsPage() {
   const [showPullIndicator, setShowPullIndicator] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("access")) {
+      router.replace("/");
+      return;
+    }
     load();
 
     const handler = () => load();
@@ -122,23 +129,12 @@ export default function AccountsPage() {
     setTimeout(() => setShowPullIndicator(false), 300);
   }, [showPullIndicator, loading]);
 
-  function getHeaders() {
-    const headers = {};
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("access");
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-    }
-    return headers;
-  }
-
   async function load() {
     setLoading(true);
     setError(null); 
     try {
       const data = await apiFetch("api/accounts/", {
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
       });
       setAccounts(data || []);
     } catch (err) {
@@ -154,6 +150,7 @@ export default function AccountsPage() {
     setEditing(null);
     setFormName("");
     setFormBalance(0);
+    setFormType("checking");
     setFormNotes("");
     setModalOpen(true);
   }
@@ -162,29 +159,28 @@ export default function AccountsPage() {
     setEditing(a);
     setFormName(a.name || "");
     setFormBalance(Number(a.balance || 0));
+    setFormType(a.account_type || "checking");
     setFormNotes(notesMap[a.id] || "");
     setModalOpen(true);
   }
 
   async function handleSave() {
     if (!formName.trim()) return alert("Enter account name");
-    if (Number(formBalance) === 0 && formBalance !== 0 && formBalance !== "") return alert("Enter a valid balance");
     setSaving(true);
     try {
+      const payload = { name: formName.trim(), balance: formBalance, account_type: formType };
       if (editing) {
-        const payload = { name: formName.trim(), balance: formBalance };
         const data = await apiFetch(`api/accounts/${editing.id}`, {
           method: "PUT",
-          headers: getHeaders(),
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
         setAccounts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
         setNotesMap((n) => ({ ...n, [data.id]: formNotes }));
       } else {
-        const payload = { name: formName.trim(), balance: formBalance };
         const data = await apiFetch("api/accounts/", {
           method: "POST",
-          headers: getHeaders(),
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
         setAccounts((prev) => [data, ...(prev || [])]);
@@ -212,7 +208,7 @@ export default function AccountsPage() {
     try {
       await apiFetch(`api/accounts/${toDelete.id}`, {
         method: "DELETE",
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
       });
       setNotesMap((n) => {
         const nxt = { ...n };
@@ -351,6 +347,21 @@ export default function AccountsPage() {
                     className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     placeholder="0.00"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm mb-1 font-medium">Account type</label>
+                  <select
+                    value={formType}
+                    onChange={(e) => setFormType(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  >
+                    <option value="checking">Checking</option>
+                    <option value="savings">Savings</option>
+                    <option value="credit">Credit Card</option>
+                    <option value="cash">Cash</option>
+                    <option value="investment">Investment</option>
+                  </select>
                 </div>
 
                 <div>

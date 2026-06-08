@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/utils/api";
+import { useRouter } from "next/navigation";
+import { apiFetch, getAuthHeaders } from "@/utils/api";
 
 function pctToColor(pct) {
   if (pct <= 33) return "bg-red-500";
@@ -58,6 +59,7 @@ function CircularProgress({ pct, size = 120, stroke = 10 }) {
 }
 
 export default function SavingsGoalsPage() {
+  const router = useRouter();
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -68,26 +70,17 @@ export default function SavingsGoalsPage() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("access")) {
+      router.replace("/");
+      return;
+    }
     loadGoals();
   }, []);
-
-  function getHeaders() {
-    const headers = {};
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("access");
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-    }
-    return headers;
-  }
 
   async function loadGoals() {
     setLoading(true);
     try {
-      const data = await apiFetch("api/savings-goals/", {
-        headers: getHeaders(),
-      });
+      const data = await apiFetch("api/savings-goals/", { headers: getAuthHeaders() });
       setGoals(data);
       setError(null);
     } catch (err) {
@@ -123,7 +116,7 @@ export default function SavingsGoalsPage() {
     try {
       const data = await apiFetch(`api/savings-goals/${active.id}/add/`, {
         method: "POST",
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ amount: amt }),
       });
       setGoals((prev) => prev.map((g) => (g.id === data.id ? data : g)));
@@ -142,7 +135,7 @@ export default function SavingsGoalsPage() {
     try {
       const goalData = await apiFetch("api/savings-goals/", {
         method: "POST",
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       setGoals((prev) => [goalData, ...(prev || [])]);
@@ -171,7 +164,7 @@ export default function SavingsGoalsPage() {
     try {
       await apiFetch(`api/savings-goals/${active.id}/`, {
         method: "PUT",
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
     } catch (err) {
@@ -190,7 +183,7 @@ export default function SavingsGoalsPage() {
     try {
       await apiFetch(`api/savings-goals/${id}/`, {
         method: "DELETE",
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
       });
     } catch (err) {
       console.warn("Delete failed", err?.message || err);

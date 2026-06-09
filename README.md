@@ -223,41 +223,6 @@ All API endpoints are prefixed with `/api/`. Auth endpoints use `AllowAny`; all 
 
 ---
 
-## Deployment
-
-### Backend (Render / Railway / Fly.io)
-```bash
-cd backend
-pip install -r requirements.txt
-gunicorn main.wsgi
-```
-Set `SECRET_KEY`, `DEBUG=False`, and `DATABASE_URL` to your PostgreSQL connection string.
-
-### Frontend (Vercel)
-```bash
-cd frontend
-npm run build
-```
-Set `NEXT_PUBLIC_API_URL` to your deployed backend URL. See `next.config.mjs` for custom configuration.
-
----
-
-## Git History
-
-```
-1388d2a test: 111 comprehensive frontend E2E tests with Playwright
-02f795d fix: accounts page pull-to-refresh overlay blocking navbar clicks
-4a7b7c5 fix: critical bugs, add budget tracking/alerting, comprehensive tests, frontend fixes
-9cfbb5f Add APITrailingSlashMiddleware
-987690f Remove trailing slashes from login/register URL patterns
-cbd79ed Remove trailing_slash from action decorator
-cbc3e68 Fix trailing slash issue causing 500 on PUT requests
-1e6139c Add migration for account_type, transaction_type, updated_at
-... and 30+ earlier commits
-```
-
----
-
 ## Bugs Caught by Tests
 
 1. **`transaction_type` missing from serializer** — Field wasn't exposed in API output

@@ -236,7 +236,8 @@ export default function AccountsPage() {
         className="fixed top-0 left-0 right-0 flex justify-center items-center transition-transform duration-200 z-40"
         style={{ 
           transform: `translateY(${pullDownY}px)`,
-          height: '60px'
+          height: '60px',
+          pointerEvents: 'none'
         }}
       >
         {showPullIndicator ? (
